@@ -4,10 +4,12 @@ import torch.nn as nn
 from torchvision import transforms, models
 from PIL import Image
 import io 
+from ultralytics import YOLO
 
 app=FastAPI()
 device=torch.device("mps" if torch.backends.mps.is_available() else("cpu"))
 model=models.mobilenet_v2(weights=None)
+yolo_model = YOLO("models/best.pt")
 model.classifier[1]=nn.Linear(in_features=1280, out_features=4)
 model.load_state_dict(torch.load("caries_model.pth" ,map_location=device))
 model.eval()
@@ -19,18 +21,19 @@ transform=transforms.Compose([
     transforms.ToTensor()
 ])
 
-@app.post("/predict")
-async def predict(file:UploadFile =File(...)):
-    image_bytes=await file.read()
-    image=Image.open(io.BytesIO(image_bytes)).convert("RGB")
-    
-    img_tensor= transform(image)
-    img_tensor=img_tensor.unsqueeze(0)
-    img_tensor=img_tensor.to(device)
-    
-    with torch.no_grad():
-        output=model(img_tensor)
-        _,predicted=torch.max(output,1)
-        
-    predicted_class=class_names[predicted.item()]
-    return{"predicted_disease": predicted_class}
+@app.post("/detect")
+async def detect(file: UploadFile = File(...)):
+    image_bytes = await file.read()
+    image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+
+    results = yolo_model.predict(image)
+
+    detections = []
+    for box in results[0].boxes:
+        detections.append({
+            "class": results[0].names[int(box.cls[0])],
+            "confidence": float(box.conf[0]),
+            "box": box.xyxy[0].tolist()
+        })
+
+    return {"detections": detections}

@@ -2,3 +2,7 @@ dataset/
 output/
 training_data/
 .DS_Store
+yolo_dataset/
+runs/
+yolov8n.pt
+__pycache__/

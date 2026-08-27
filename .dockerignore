@@ -3,3 +3,7 @@ output/
 training_data/
 .git/
 .DS_Store
+yolo_dataset/
+runs/
+yolov8n.pt
+__pycache__/

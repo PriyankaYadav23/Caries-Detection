@@ -12,5 +12,5 @@ docker run -p 8000:8000 caries-detection-api     # container run
 
 ### Git
 git add .
-git commit -m "message likho"
+git commit -m "msg"
 git push

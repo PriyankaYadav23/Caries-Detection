@@ -4,3 +4,7 @@ torch
 torchvision
 pillow
 python-multipart
+ultralytics
+opencv-python
+scikit-learn
+streamlit
