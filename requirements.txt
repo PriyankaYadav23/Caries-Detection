@@ -5,6 +5,6 @@ torchvision
 pillow
 python-multipart
 ultralytics
-opencv-python
+opencv-python-headless
 scikit-learn
 streamlit
