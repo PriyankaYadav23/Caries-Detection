@@ -2,7 +2,7 @@ import streamlit as st
 from ultralytics import YOLO
 from PIL import Image
 
-st.title("Denal x-ray detection")
+st.title("Dental x-ray detection")
 st.write("Upload a full panaromic xray to detect disease areas")
 @st.cache_resource
 def load_model():
