@@ -1,76 +1,111 @@
-# Dental Caries Detection
+# 🦷 Dental Caries Detection: Tooth Disease Classification & Detection on X-rays
 
-This project detects dental diseases from panoramic X-ray images. It has two components: an image classifier that labels a cropped tooth image, and a YOLO-based object detector that finds and labels disease regions directly on a full X-ray. Both are served through a live Streamlit demo and a FastAPI backend.
+A computer vision system that finds dental diseases on panoramic X-rays. It has two models: one labels a single cropped tooth, and one finds and labels every disease region on a full X-ray by itself. Built on the DENTEX dataset (MICCAI 2023 challenge).
 
-## About the Project
+## 🧠 Machine Learning Pipeline
 
-Built on the **DENTEX dataset** (MICCAI 2023 challenge), which contains panoramic dental X-rays with quadrant, tooth-number, and diagnosis annotations, covering 4 disease categories:
-- Caries
-- Deep Caries
-- Impacted
-- Periapical Lesion
+### Architecture Overview
 
-## Approach 1: Classification (MobileNetV2)
+The project uses two models that solve two different problems:
 
-Individual teeth are cropped from full X-rays using bounding-box annotations, then classified into one of the 4 disease categories.
+1. **MobileNetV2 (Classification)** - Looks at one cropped tooth and says which disease it has
+2. **YOLOv8n (Detection)** - Looks at a full X-ray, draws a box around each disease area, and labels it
 
-- **Model:** MobileNetV2 (transfer learning, pretrained on ImageNet), with a custom 4-class classification head
-- **Class imbalance handling:** the dataset is heavily imbalanced (Caries: 2189 images vs. Periapical Lesion: 158 images). Multiple class-weighting strategies were systematically tested
+Both models predict 4 disease types: **Caries, Deep Caries, Impacted, Periapical Lesion**.
 
-**Known limitation:** minority classes (particularly Periapical Lesion, with only 158 training images) have lower recall than majority classes. This is a known limitation of the dataset size and is documented as an area for future improvement (e.g., more data collection, further augmentation strategies).
+### Technical Implementation
 
-## Approach 2: Detection (YOLOv8)
+- **Data Preparation**: Cropped 3,529 tooth regions out of 705 X-rays using the dataset's bounding boxes
+- **Transfer Learning**: MobileNetV2 starts from ImageNet weights, YOLOv8n starts from COCO weights
+- **Format Conversion**: Wrote my own converter from COCO boxes (corner + size, in pixels) to YOLO boxes (center + size, from 0 to 1)
+- **Apple GPU Training**: Both models trained locally on Apple Silicon (MPS)
 
-Rather than requiring teeth to be pre-cropped, a YOLOv8 model is trained to directly locate disease regions on a full panoramic X-ray and draw a bounding box around each one, labeled with the disease type and confidence score.
+## ⚖️ Class Imbalance Experiments
 
-- **Model:** YOLOv8n, fine-tuned from pretrained COCO weights on the DENTEX annotations (599 train / 106 val images, converted from COCO-style bounding boxes to YOLO format)
-- **Training:** 50 epochs, 640px input, trained locally on Apple Silicon (MPS backend)
-- **Results:** mAP50 = 0.478, mAP50-95 = 0.31 overall. Per-class recall: Impacted 0.91, Caries 0.41, Periapical Lesion 0.32, Deep Caries 0.32 (reflects the same class imbalance noted above)
+### The Problem
 
-## Live Demo
+The data is very uneven: **Caries has 2,189 images, Periapical Lesion has only 158**. The first classifier reached 77% accuracy, but it almost never predicted Periapical Lesion (recall 0.03).
 
-Two Streamlit apps let you upload an X-ray and see predictions instantly:
+### What I Tried
 
-```bash
-streamlit run app.py             # classifier demo (single cropped tooth)
-streamlit run app_detection.py   # detector demo (full X-ray, bounding boxes)
+- **Class-weighted loss (3 strengths)**: Rare classes get a bigger penalty when the model gets them wrong
+- **Data augmentation**: Random rotation, flip, and brightness/contrast changes
+- **Result**: Each fix helped one class but hurt another. None was clearly better than the baseline
+- **Likely reason**: Only the last layer was trained (the rest of MobileNetV2 was frozen), so the model could not learn fine X-ray texture differences
+
+## 📊 Results
+
+| Model | Result |
+|---|---|
+| MobileNetV2 classifier | 77% accuracy (Periapical Lesion is still the weakest class) |
+| YOLOv8n detector | mAP50 = 0.478, mAP50-95 = 0.31 |
+| Detector recall per class | Impacted 0.91 · Caries 0.41 · Periapical Lesion 0.32 · Deep Caries 0.32 |
+
+The same imbalance pattern shows up in both models, which points to the data (not one model) as the real bottleneck.
+
+## 🎬 Demo
+
+**Live detector demo (Streamlit Cloud):** `ADD_YOUR_STREAMLIT_LINK_HERE`
+
+![Detection Demo](examples/dental.jpeg)
+
+*The detector finds a Deep Caries region on a full panoramic X-ray and labels it with a confidence score of 0.68.*
+
+## 🛠️ Technology Stack
+
+**Deep Learning & Computer Vision**
+- PyTorch, torchvision
+- Ultralytics YOLOv8
+- Pillow
+- scikit-learn
+
+**Web Application & API**
+- FastAPI
+- Uvicorn
+- Streamlit
+
+**Deployment**
+- Docker
+- Streamlit Community Cloud
+
+## 🎮 Features
+
+- **Two Ways to Predict**: Classify one cropped tooth, or detect diseases on a whole X-ray
+- **Bounding Boxes**: Each detection shows the disease name and a confidence score
+- **REST API**: `POST /detect` returns every detection as JSON (class, confidence, box)
+- **Live Web Demo**: Upload an image in the browser and see results instantly
+- **Portable**: The API runs the same way anywhere with Docker
+
+## 📁 Project Structure
+
+```
+├── data_prepartion.ipynb   # Crop teeth from X-rays + train/val split
+├── trainingdata.ipynb      # Train MobileNetV2 + class imbalance experiments
+├── convert_to_yolo.py      # Convert COCO annotations to YOLO format
+├── train_yolo.py           # Train the YOLOv8n detector
+├── data.yaml               # YOLO dataset config (paths + class names)
+├── app.py                  # Streamlit demo: classifier
+├── app_detection.py        # Streamlit demo: detector (deployed live)
+├── main.py                 # FastAPI backend (/detect endpoint)
+├── caries_model.pth        # Trained classifier weights
+├── models/best.pt          # Trained YOLO detector weights
+├── Dockerfile              # Container for the API
+├── requirements.txt        # Python dependencies
+└── packages.txt            # System libraries for Streamlit Cloud
 ```
 
-## API
+## 🏆 Technical Achievements
 
-A FastAPI backend exposes both models over HTTP:
+- **Two Complete Models**: A classifier and a detector built from the same raw annotations
+- **Custom Data Pipeline**: Tooth cropping and COCO-to-YOLO conversion written from scratch
+- **Honest Imbalance Study**: Tested 4 fixes, measured each one, and explained why none fully worked
+- **Real Deployment Debugging**: Fixed 3 rounds of missing system libraries on Streamlit Cloud, one error at a time
 
-```bash
-uvicorn main:app --reload --port 8001
-```
+## 🔮 Future Improvements
 
-- `POST /predict` — classifier: returns the predicted disease label for a cropped tooth image
-- `POST /detect` — detector: returns a list of detections, each with class, confidence, and bounding box coordinates
+- Unfreeze part of MobileNetV2 so it can learn X-ray-specific features
+- Combine both models: the detector finds teeth, the classifier confirms the disease
+- Add a `/predict` classifier endpoint to the API
+- Show a "low confidence, needs review" warning in the demo
 
-Interactive docs available at `/docs` once the server is running.
-
-## Running with Docker
-
-```bash
-docker build -t caries-detection .
-docker run -p 8000:8000 caries-detection
-```
-
-## Project Structure
-
-```
-├── main.py                 # FastAPI app (classifier + detector endpoints)
-├── app.py                  # Streamlit demo — classifier
-├── app_detection.py        # Streamlit demo — detector
-├── convert_to_yolo.py      # converts DENTEX COCO annotations to YOLO format
-├── train_yolo.py           # trains the YOLOv8 detector
-├── data.yaml               # YOLO dataset config
-├── caries_model.pth        # trained classifier weights
-├── models/best.pt          # trained YOLO detector weights
-└── requirements.txt
-```
-
-## Future Improvements
-
-- Address class imbalance for the detector (currently mitigated informally by dataset size only)
-- Combine both approaches: use the detector to locate teeth, then the classifier to confirm disease type
+> ⚠️ This is a portfolio project, not a medical tool. Predictions need review by a dentist.
