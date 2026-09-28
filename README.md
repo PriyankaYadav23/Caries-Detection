@@ -45,7 +45,7 @@ The same imbalance pattern shows up in both models, which points to the data (no
 
 ## 🎬 Demo
 
-**Live detector demo (Streamlit Cloud):** `ADD_YOUR_STREAMLIT_LINK_HERE`
+**Live detector demo (Streamlit Cloud):** `https://caries-detection-rdtqwvaq9lnuov6gspyqyc.streamlit.app/`
 
 ![Detection Demo](examples/dental.jpeg)
 
